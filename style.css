@@ -19,16 +19,16 @@
   --border: #475569;
   --text: #f8fafc;
   --muted: #94a3b8;
-  --actual: #3b82f6;
+  --actual: #22d3ee;
   --output: #f97316;
   --accent: #10b981;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
   --datalabel-color: #ffffff;
 }
 
-* { 
-  box-sizing: border-box; 
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease; 
+* {
+  box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
 
 body {
@@ -113,6 +113,7 @@ h1 {
 
 .panel:nth-child(2) { animation-delay: 0.1s; }
 .panel:nth-child(3) { animation-delay: 0.2s; }
+.panel:nth-child(4) { animation-delay: 0.3s; }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(15px); }
@@ -158,8 +159,8 @@ select {
   font-weight: 500;
 }
 
-select:focus { 
-  border-color: var(--accent); 
+select:focus {
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
@@ -186,29 +187,38 @@ select:focus {
   border-color: var(--accent);
 }
 
-.stat .k { 
-  font-size: 11px; 
-  color: var(--muted); 
-  text-transform: uppercase; 
-  letter-spacing: 0.6px; 
+.stat .k {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   font-weight: 600;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
 }
 
-.stat .v { 
-  font-size: 22px; 
-  font-weight: 700; 
+.stat .v {
+  font-size: 22px;
+  font-weight: 700;
   color: var(--text);
 }
 
-.legend-dot { 
-  display:inline-block; 
-  width: 10px; 
-  height: 10px; 
-  border-radius: 3px; 
-  margin-right: 8px; 
+.legend-dot {
+  display:inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 8px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
 }
 
 .chart-wrap {
@@ -223,7 +233,7 @@ select:focus {
 .chart-wrap::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
 
 .chart-inner {
-  height: 480px;
+  height: 420px;
   position: relative;
 }
 
