@@ -3,13 +3,18 @@ Chart.register(ChartDataLabels);
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXWXkUBJ8iyLK2vd9qnUJcCaiBO0-d3KmzEzgnnEypiHgxWhUQwbXYnEwUSb6xdXHyQ48x1dAcdTkk/pub?gid=131190311&single=true&output=csv";
 
-// Sirf 2026 ka data chahiye — is filter se 2025 (ya koi aur saal) automatically hat jayega
+// Sirf 2026 ka data chahiye
 const TARGET_YEAR = "2026";
+
+// Fixed colors jaisa aapne bola: Actual = Red, Output = Blue (theme se independent)
+const ACTUAL_COLOR = '#ef4444';
+const ACTUAL_FILL = 'rgba(239,68,68,0.12)';
+const OUTPUT_COLOR = '#3b82f6';
+const OUTPUT_FILL = 'rgba(59,130,246,0.12)';
 
 let globalData = {};
 let globalDates = [];
-let chartActual = null;
-let chartOutput = null;
+let activeCharts = []; // sab dynamically bane charts yahan store honge taaki destroy kar sakein
 
 // Theme Management
 const themeToggle = document.getElementById('themeToggle');
@@ -32,21 +37,15 @@ themeToggle.addEventListener('click', () => {
   html.setAttribute('data-theme', newTheme);
   localStorage.setItem('theme', newTheme);
 
-  // Re-render both charts to apply new colors smoothly
   const emp = document.getElementById('empSelect').value;
-  const task = document.getElementById('taskSelect').value;
-  if (emp && task && globalData[emp]) {
-    renderCharts(emp, task);
+  if (emp && globalData[emp]) {
+    renderAllCharts(emp);
   }
 });
 
-function getChartColors() {
+function getUIColors() {
   const isDark = html.getAttribute('data-theme') === 'dark';
   return {
-    actual: isDark ? '#22d3ee' : '#0891b2',
-    actualFill: isDark ? 'rgba(34,211,238,0.15)' : 'rgba(8,145,178,0.10)',
-    output: isDark ? '#f97316' : '#ea580c',
-    outputFill: isDark ? 'rgba(249,115,22,0.15)' : 'rgba(234,88,12,0.10)',
     datalabel: isDark ? '#ffffff' : '#1e293b',
     grid: isDark ? '#334155' : '#e2e8f0',
     text: isDark ? '#94a3b8' : '#64748b',
@@ -97,28 +96,26 @@ async function fetchData() {
 
     if (rows.length < 3) throw new Error("Invalid CSV format");
 
+    // Har hafte ka date-header column dhoondo (jisme ek 4-digit saal jaisa 2025/2026 ho).
+    // Sheet structure: date-col => Score>NotDone (Actual); date-col+2 => Commitment>NotDone (Output)
     const row0 = rows[0];
     const datePairs = [];
 
     for (let i = 0; i < row0.length; i++) {
       const cell = row0[i] ? row0[i].trim() : '';
-      if (cell.match(/January|February|March|April|May|June|July|August|September|October|November|December/)) {
-        if (i + 4 < row0.length) {
-          const nextCell = row0[i + 4] ? row0[i + 4].trim() : '';
-          if (nextCell.match(/January|February|March|April|May|June|July|August|September|October|November|December/)) {
-            datePairs.push({
-              label: cell,
-              actualCol: i + 2,
-              outputCol: i + 6
-            });
-            i += 3;
-          }
-        }
+      const yearMatch = cell.match(/(20\d{2})/); // e.g. "2025", "2026"
+      if (yearMatch && i + 2 < row0.length) {
+        datePairs.push({
+          label: cell,
+          year: yearMatch[1],
+          actualCol: i,      // Score > Not Done
+          outputCol: i + 2   // Commitment > Not Done
+        });
       }
     }
 
-    // Sirf TARGET_YEAR (2026) wale month-columns rakhein — baaki saal ignore
-    const filteredPairs = datePairs.filter(p => p.label.includes(TARGET_YEAR));
+    // Sirf TARGET_YEAR (2026) wale hafte-columns rakhein
+    const filteredPairs = datePairs.filter(p => p.year === TARGET_YEAR);
 
     globalDates = filteredPairs.map(p => p.label);
     let currentTeam = '';
@@ -182,70 +179,113 @@ function populateEmployees() {
 
   if (employees.length > 0) {
     empSelect.value = employees[0];
-    populateTasks(employees[0]);
+    renderAllCharts(employees[0]);
   }
 }
 
-function populateTasks(emp) {
-  const taskSelect = document.getElementById('taskSelect');
-  taskSelect.innerHTML = '';
+// Har task ke liye 2026 ke records banata hai aur (actual - output) ka average diff nikalta hai
+function computeTaskDiffs(emp) {
   const tasks = Object.keys(globalData[emp] || {}).sort();
-  tasks.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t;
-    opt.textContent = t;
-    taskSelect.appendChild(opt);
+  const results = [];
+
+  tasks.forEach(task => {
+    const taskData = globalData[emp][task];
+    const activeDates = globalDates.filter(d => taskData[d]);
+    const records = activeDates.map(d => ({
+      date: d,
+      actual: taskData[d].actual,
+      output: taskData[d].output
+    }));
+
+    let diffSum = 0;
+    let count = 0;
+    records.forEach(r => {
+      if (r.actual !== null && r.output !== null) {
+        diffSum += (r.actual - r.output);
+        count++;
+      }
+    });
+
+    const avgDiff = count > 0 ? (diffSum / count) : null;
+
+    // Kitne months mein shortfall (actual < output) hua, aur list bhi banao
+    const shortfallMonths = records.filter(r => r.actual !== null && r.output !== null && r.actual < r.output);
+    const hasAnyShortfall = shortfallMonths.length > 0;
+
+    results.push({ task, records, avgDiff, shortfallMonths, hasAnyShortfall });
   });
 
-  if (tasks.length > 0) {
-    renderCharts(emp, tasks[0]);
-  }
+  return results;
 }
 
-function renderStats(records) {
-  const actualVals = records.map(r => r.actual).filter(v => v !== null);
-  const outputVals = records.map(r => r.output).filter(v => v !== null);
+function renderStats(allTaskDiffs, minusTasks) {
+  const totalTasks = allTaskDiffs.length;
+  const minusCount = minusTasks.length;
 
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const avg = arr => arr.length ? (sum(arr) / arr.length) : 0;
+  const allActual = minusTasks.flatMap(t => t.records.map(r => r.actual).filter(v => v !== null));
+  const allOutput = minusTasks.flatMap(t => t.records.map(r => r.output).filter(v => v !== null));
+  const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 
   document.getElementById('statsRow').innerHTML = `
-    <div class="stat"><div class="k"><span class="legend-dot" style="background:var(--actual)"></span>Actual Avg</div><div class="v">${avg(actualVals).toFixed(1)}</div></div>
-    <div class="stat"><div class="k"><span class="legend-dot" style="background:var(--output)"></span>Output Avg</div><div class="v">${avg(outputVals).toFixed(1)}</div></div>
-    <div class="stat"><div class="k">Total Entries</div><div class="v">${records.length}</div></div>
-    <div class="stat"><div class="k">Actual Min / Max</div><div class="v" style="font-size:15px">${actualVals.length ? Math.min(...actualVals) : '-'} / ${actualVals.length ? Math.max(...actualVals) : '-'}</div></div>
+    <div class="stat"><div class="k">Total Tasks</div><div class="v">${totalTasks}</div></div>
+    <div class="stat"><div class="k"><span class="legend-dot" style="background:#ef4444"></span>Tasks with Any Shortfall</div><div class="v">${minusCount}</div></div>
+    <div class="stat"><div class="k">These Tasks — Actual Avg</div><div class="v">${avg(allActual).toFixed(1)}</div></div>
+    <div class="stat"><div class="k">These Tasks — Output Avg</div><div class="v">${avg(allOutput).toFixed(1)}</div></div>
   `;
 }
 
-// Ek generic function jo ek single-metric (Actual YA Output) line chart banata hai
-function renderSingleChart(containerId, records, metricKey, color, fillColor, colors, existingChart) {
-  const chartContainer = document.getElementById(containerId);
+function buildChartForTask(taskInfo, colors) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'panel';
 
-  if (records.length === 0) {
-    chartContainer.innerHTML = `<div class="empty">Is task ke liye ${TARGET_YEAR} mein koi data nahi mila.</div>`;
-    return null;
-  }
+  const title = document.createElement('div');
+  title.className = 'chart-title';
+  const monthsList = taskInfo.shortfallMonths.map(r => r.date).join(', ');
+  title.innerHTML = `<span class="legend-dot" style="background:#ef4444"></span>${taskInfo.task} <span style="color:var(--muted);font-weight:500;font-size:13px;margin-left:8px;">(${taskInfo.shortfallMonths.length} month${taskInfo.shortfallMonths.length > 1 ? 's' : ''} minus: ${monthsList})</span>`;
+  wrapper.appendChild(title);
 
-  chartContainer.innerHTML = '<canvas></canvas>';
-  const canvas = chartContainer.querySelector('canvas');
+  const chartWrap = document.createElement('div');
+  chartWrap.className = 'chart-wrap';
+  const chartInner = document.createElement('div');
+  chartInner.className = 'chart-inner';
+  const canvas = document.createElement('canvas');
+  chartInner.appendChild(canvas);
+  chartWrap.appendChild(chartInner);
+  wrapper.appendChild(chartWrap);
 
-  const minWidth = Math.max(800, records.length * 70);
-  canvas.parentElement.style.width = minWidth + 'px';
+  document.getElementById('tasksContainer').appendChild(wrapper);
+
+  const minWidth = Math.max(700, taskInfo.records.length * 70);
+  chartInner.style.width = minWidth + 'px';
 
   const ctx = canvas.getContext('2d');
-  if (existingChart) existingChart.destroy();
 
-  return new Chart(ctx, {
+  const newChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: records.map(r => r.date),
+      labels: taskInfo.records.map(r => r.date),
       datasets: [
         {
-          label: metricKey === 'actual' ? 'Actual' : 'Output',
-          data: records.map(r => r[metricKey]),
-          borderColor: color,
-          backgroundColor: fillColor,
-          pointBackgroundColor: color,
+          label: 'Actual',
+          data: taskInfo.records.map(r => r.actual),
+          borderColor: ACTUAL_COLOR,
+          backgroundColor: ACTUAL_FILL,
+          pointBackgroundColor: ACTUAL_COLOR,
+          pointBorderColor: colors.pointBorder,
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          borderWidth: 3,
+          tension: 0.35,
+          fill: true,
+          spanGaps: true
+        },
+        {
+          label: 'Output',
+          data: taskInfo.records.map(r => r.output),
+          borderColor: OUTPUT_COLOR,
+          backgroundColor: OUTPUT_FILL,
+          pointBackgroundColor: OUTPUT_COLOR,
           pointBorderColor: colors.pointBorder,
           pointBorderWidth: 2,
           pointRadius: 6,
@@ -306,33 +346,35 @@ function renderSingleChart(containerId, records, metricKey, color, fillColor, co
       }
     }
   });
+
+  activeCharts.push(newChart);
 }
 
-function renderCharts(emp, task) {
-  const taskData = (globalData[emp] && globalData[emp][task]) ? globalData[emp][task] : {};
-  const activeDates = globalDates.filter(d => taskData[d]);
-  const records = activeDates.map(d => ({
-    date: d,
-    actual: taskData[d].actual,
-    output: taskData[d].output
-  }));
+function renderAllCharts(emp) {
+  // Purane charts destroy karo aur container khali karo
+  activeCharts.forEach(c => c.destroy());
+  activeCharts = [];
+  const container = document.getElementById('tasksContainer');
+  container.innerHTML = '';
 
-  const colors = getChartColors();
+  const allTaskDiffs = computeTaskDiffs(emp);
+  // Wo saare tasks jinme KAM SE KAM ek bhi month mein shortfall (Actual < Output) hua ho
+  const minusTasks = allTaskDiffs.filter(t => t.hasAnyShortfall);
 
-  chartActual = renderSingleChart('chartContainerActual', records, 'actual', colors.actual, colors.actualFill, colors, chartActual);
-  chartOutput = renderSingleChart('chartContainerOutput', records, 'output', colors.output, colors.outputFill, colors, chartOutput);
+  renderStats(allTaskDiffs, minusTasks);
 
-  renderStats(records);
+  if (minusTasks.length === 0) {
+    container.innerHTML = `<div class="panel"><div class="empty">Is employee ke ${TARGET_YEAR} tasks mein koi bhi task "minus" (shortfall) mein nahi hai. 🎉</div></div>`;
+    return;
+  }
+
+  const colors = getUIColors();
+  minusTasks.forEach(taskInfo => buildChartForTask(taskInfo, colors));
 }
 
 // Event Listeners
 document.getElementById('empSelect').addEventListener('change', (e) => {
-  populateTasks(e.target.value);
-});
-
-document.getElementById('taskSelect').addEventListener('change', (e) => {
-  const emp = document.getElementById('empSelect').value;
-  renderCharts(emp, e.target.value);
+  renderAllCharts(e.target.value);
 });
 
 // Initialize App
