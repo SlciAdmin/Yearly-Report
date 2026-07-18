@@ -150,6 +150,14 @@ function computeAllTasks(emp) {
   });
 }
 
+// Task ke sabhi pairs mein Actual aur Output dono hamesha zero (ya missing) hain to true return karta hai.
+// Aisa task poori tarah zero maana jaata hai, isliye uska graph show nahi kiya jaata.
+function isTaskAllZero(taskInfo) {
+  return taskInfo.pairs.every(p =>
+    (p.actual === null || p.actual === 0) && (p.output === null || p.output === 0)
+  );
+}
+
 function renderStats(allTasks) {
   const totalTasks = allTasks.length;
   const allActual = allTasks.flatMap(t => t.pairs.map(p => p.actual).filter(v => v !== null));
@@ -243,7 +251,14 @@ function renderAllCharts(emp) {
   const container = document.getElementById('tasksContainer');
   container.innerHTML = '';
 
-  const allTasks = computeAllTasks(emp);
+  // Sirf wahi tasks rakho jinke kisi bhi pair mein actual ya output ki koi
+  // real value ho (0 bhi valid value hai). Jin tasks mein har jagah data
+  // hi missing/null hai (kabhi report hi nahi hua), unhe hide kar do.
+  // Saath hi jin tasks mein Actual aur Output dono hamesha zero hain,
+  // unka graph bhi show nahi karna — baki sabhi tasks ka graph dikhega.
+  const allTasksRaw = computeAllTasks(emp);
+  const allTasks = allTasksRaw.filter(t => t.hasAnyData && !isTaskAllZero(t));
+
   renderStats(allTasks);
 
   if (allTasks.length === 0) {
@@ -251,7 +266,6 @@ function renderAllCharts(emp) {
     return;
   }
   const colors = getUIColors();
-  // Sabhi tasks dikhao — zero values wale bhi
   allTasks.forEach(taskInfo => buildChartForTask(taskInfo, colors));
 }
 
