@@ -6,7 +6,7 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXWXkUBJ8iyL
 // Sirf 2026 ka data chahiye
 const TARGET_YEAR = "2026";
 
-// Fixed colors jaisa aapne bola: Actual = Red, Output = Blue (theme se independent)
+// Fixed colors: Actual = Red, Output = Blue (theme se independent)
 const ACTUAL_COLOR = '#ef4444';
 const ACTUAL_FILL = 'rgba(239,68,68,0.12)';
 const OUTPUT_COLOR = '#3b82f6';
@@ -15,17 +15,13 @@ const OUTPUT_FILL = 'rgba(59,130,246,0.12)';
 let globalData = {};
 let globalDates = [];
 let activeCharts = []; // sab dynamically bane charts yahan store honge taaki destroy kar sakein
+let employeesList = [];
 
 // Theme Management
 const themeToggle = document.getElementById('themeToggle');
 const html = document.documentElement;
 
-const savedTheme = localStorage.getItem('theme');
-const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-if (savedTheme) {
-  html.setAttribute('data-theme', savedTheme);
-} else if (systemPrefersDark) {
+if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
   html.setAttribute('data-theme', 'dark');
 } else {
   html.setAttribute('data-theme', 'light');
@@ -35,7 +31,6 @@ themeToggle.addEventListener('click', () => {
   const currentTheme = html.getAttribute('data-theme');
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
 
   const emp = document.getElementById('empSelect').value;
   if (emp && globalData[emp]) {
@@ -91,6 +86,7 @@ function parseCSV(text) {
 async function fetchData() {
   try {
     const response = await fetch(SHEET_URL);
+    if (!response.ok) throw new Error("Network response not ok: " + response.status);
     const csvText = await response.text();
     const rows = parseCSV(csvText);
 
@@ -169,17 +165,18 @@ async function fetchData() {
 function populateEmployees() {
   const empSelect = document.getElementById('empSelect');
   empSelect.innerHTML = '';
-  const employees = Object.keys(globalData).sort();
-  employees.forEach(emp => {
+  employeesList = Object.keys(globalData).sort();
+  employeesList.forEach(emp => {
     const opt = document.createElement('option');
     opt.value = emp;
     opt.textContent = emp;
     empSelect.appendChild(opt);
   });
 
-  if (employees.length > 0) {
-    empSelect.value = employees[0];
-    renderAllCharts(employees[0]);
+  if (employeesList.length > 0) {
+    empSelect.value = employeesList[0];
+    document.getElementById('empSearch').value = employeesList[0];
+    renderAllCharts(employeesList[0]);
   }
 }
 
@@ -372,9 +369,58 @@ function renderAllCharts(emp) {
   minusTasks.forEach(taskInfo => buildChartForTask(taskInfo, colors));
 }
 
-// Event Listeners
+// ---- Employee dropdown ----
 document.getElementById('empSelect').addEventListener('change', (e) => {
+  document.getElementById('empSearch').value = e.target.value;
   renderAllCharts(e.target.value);
+});
+
+// ---- Employee search box (autocomplete) ----
+const empSearchInput = document.getElementById('empSearch');
+const searchResultsBox = document.getElementById('searchResults');
+
+function showSearchResults(matches) {
+  searchResultsBox.innerHTML = '';
+  if (matches.length === 0) {
+    searchResultsBox.classList.remove('open');
+    return;
+  }
+  matches.forEach(name => {
+    const item = document.createElement('div');
+    item.textContent = name;
+    item.addEventListener('click', () => {
+      empSearchInput.value = name;
+      document.getElementById('empSelect').value = name;
+      searchResultsBox.classList.remove('open');
+      renderAllCharts(name);
+    });
+    searchResultsBox.appendChild(item);
+  });
+  searchResultsBox.classList.add('open');
+}
+
+empSearchInput.addEventListener('input', () => {
+  const q = empSearchInput.value.trim().toLowerCase();
+  if (!q) {
+    searchResultsBox.classList.remove('open');
+    return;
+  }
+  const matches = employeesList.filter(name => name.toLowerCase().includes(q));
+  showSearchResults(matches);
+});
+
+empSearchInput.addEventListener('focus', () => {
+  if (empSearchInput.value.trim()) {
+    const q = empSearchInput.value.trim().toLowerCase();
+    const matches = employeesList.filter(name => name.toLowerCase().includes(q));
+    showSearchResults(matches);
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) {
+    searchResultsBox.classList.remove('open');
+  }
 });
 
 // Initialize App
