@@ -1,10 +1,11 @@
 // Register Chart.js Datalabels Plugin
 Chart.register(ChartDataLabels);
 
+// gid=131190311 => "MIS-2025" tab (confirmed from sheet). Data isi tab se aata hai.
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXWXkUBJ8iyLK2vd9qnUJcCaiBO0-d3KmzEzgnnEypiHgxWhUQwbXYnEwUSb6xdXHyQ48x1dAcdTkk/pub?gid=131190311&single=true&output=csv";
 
-// Sirf 2026 ka data chahiye
-const TARGET_YEAR = "2026";
+// Sirf 2025 ka data chahiye
+const TARGET_YEAR = "2025";
 
 // Fixed colors: Actual = Red, Output = Blue (theme se independent)
 const ACTUAL_COLOR = '#ef4444';
@@ -100,12 +101,14 @@ async function fetchData() {
     for (let i = 0; i < row0.length; i++) {
       const cell = row0[i] ? row0[i].trim() : '';
       const yearMatch = cell.match(/(20\d{2})/); // e.g. "2025", "2026"
-      if (yearMatch && i + 2 < row0.length) {
+      // Har week-block 6 columns ka hai: [Score][Not Done][Delay][Commitment][Not Done][Delay]
+      // Date-label sirf pehle column (Score) mein hoti hai, isliye offset se actual/output nikaalte hain
+      if (yearMatch && i + 4 < row0.length) {
         datePairs.push({
           label: cell,
           year: yearMatch[1],
-          actualCol: i,      // Score > Not Done
-          outputCol: i + 2   // Commitment > Not Done
+          actualCol: i + 1,  // Score > Not Done
+          outputCol: i + 4   // Commitment > Not Done
         });
       }
     }
