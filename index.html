@@ -1,49 +1,42 @@
 <!DOCTYPE html>
 <html lang="hi" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employee Task Performance Dashboard</title>
-
-  <!-- External CSS -->
-  <link rel="stylesheet" href="style.css">
-
-  <!-- Chart.js and Datalabels Plugin -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employee Task Performance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <div class="header">
-    <div>
-      <h1>Employee Task Performance — Minus (Shortfall) Tasks (2026)</h1>
-      <div class="sub">Google Sheet se live data fetch ho raha hai. Sirf Employee select karein — jin tasks mein Actual, Output (commitment) se kam hai, unka alag-alag graph niche dikhega.</div>
-    </div>
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle Theme">
-      <svg class="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-      <svg class="moon-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-    </button>
+<div class="header">
+  <div>
+    <h1>Employee Task Performance — Actual vs Output (2026)</h1>
+    <div class="sub">Google Sheet se live data. Employee select karein — uske <b>sabhi tasks</b> ka graph niche dikhega (zero values bhi shamil), Actual (Red) vs Output (Blue).</div>
+    <div class="note">ℹ️ Har week ki Commitment value <b>Actual</b> ban jaati hai, aur usse agli week ki Commitment value uska <b>Output</b> ban jaati hai. Phir agli jodi (pair) mein yehi dobara: 3rd week = Actual, 4th week = Output, waghera.</div>
   </div>
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle Theme">
+    <svg class="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    <svg class="moon-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
+</div>
 
-  <div class="panel">
-    <div id="loadingMsg" class="loading">Data load ho raha hai, kripya prateeksha karein...</div>
-
-    <div class="controls" id="controlsRow" style="display: none;">
-      <div class="field">
-        <label>Employee Name</label>
-        <select id="empSelect"></select>
-      </div>
+<div class="panel">
+  <div id="loadingMsg" class="loading">Data load ho raha hai, kripya prateeksha karein...</div>
+  <div class="controls" id="controlsRow" style="display:none;">
+    <div class="field">
+      <label>Employee Name</label>
+      <select id="empSelect"></select>
     </div>
-
-    <div class="stats" id="statsRow"></div>
   </div>
+  <div class="stats" id="statsRow"></div>
+</div>
 
-  <!-- Har "minus" task ka alag panel yahan JS se inject hoga -->
-  <div id="tasksContainer"></div>
+<div id="tasksContainer"></div>
 
-  <div class="hint" style="margin: 0 4px 24px;">💡 <span class="legend-dot" style="background:#ef4444"></span>Actual (Red) &nbsp; <span class="legend-dot" style="background:#3b82f6"></span>Output / Commitment (Blue) — X-axis par 2026 ke months hain.</div>
+<div class="hint" style="margin:0 4px 24px;">💡 <span class="legend-dot" style="background:#ef4444"></span>Actual (Red) &nbsp; <span class="legend-dot" style="background:#3b82f6"></span>Output (Blue) — X-axis par week-pairs hain.</div>
 
-  <!-- External JavaScript -->
-  <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
